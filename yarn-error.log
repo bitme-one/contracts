@@ -1,0 +1,81 @@
+Arguments: 
+  /Users/anton/.nvm/versions/node/v14.17.4/bin/node /Users/anton/.nvm/versions/node/v14.17.4/bin/yarn add contracts-upgradeable
+
+PATH: 
+  /Users/anton/.nvm/versions/node/v14.17.4/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Library/Apple/usr/bin:/Library/Frameworks/Mono.framework/Versions/Current/Commands:/Applications/Wireshark.app/Contents/MacOS:/Users/anton/.nvm/versions/node/v14.17.4/bin:/Users/anton/Library/Android/sdk//tools:/Users/anton/Library/Android/sdk//platform-tools:/Users/anton/Development/flutter/bin:/Users/anton/Library/Android/sdk//tools:/Users/anton/Library/Android/sdk//platform-tools:/Users/anton/Development/flutter/bin
+
+Yarn version: 
+  1.22.11
+
+Node version: 
+  14.17.4
+
+Platform: 
+  darwin x64
+
+Trace: 
+  Error: https://registry.yarnpkg.com/contracts-upgradeable: Not found
+      at Request.params.callback [as _callback] (/Users/anton/.nvm/versions/node/v14.17.4/lib/node_modules/yarn/lib/cli.js:66992:18)
+      at Request.self.callback (/Users/anton/.nvm/versions/node/v14.17.4/lib/node_modules/yarn/lib/cli.js:140763:22)
+      at Request.emit (events.js:400:28)
+      at Request.<anonymous> (/Users/anton/.nvm/versions/node/v14.17.4/lib/node_modules/yarn/lib/cli.js:141735:10)
+      at Request.emit (events.js:400:28)
+      at IncomingMessage.<anonymous> (/Users/anton/.nvm/versions/node/v14.17.4/lib/node_modules/yarn/lib/cli.js:141657:12)
+      at Object.onceWrapper (events.js:519:28)
+      at IncomingMessage.emit (events.js:412:35)
+      at endReadableNT (internal/streams/readable.js:1317:12)
+      at processTicksAndRejections (internal/process/task_queues.js:82:21)
+
+npm manifest: 
+  {
+    "name": "bainetwork",
+    "version": "0.0.2",
+    "description": "",
+    "main": "index.js",
+    "scripts": {
+      "build": "npm run clean && npm run compile",
+      "clean": "npx hardhat clean",
+      "compile": "npx hardhat compile",
+      "test": "npx hardhat test",
+      "coverage": "npm run build && npx hardhat coverage --temp artifacts --network coverage"
+    },
+    "repository": {
+      "type": "git",
+      "url": "git+https://github.com/bainetwork/contracts.git"
+    },
+    "author": "ronald",
+    "license": "MIT",
+    "homepage": "https://github.com/bainetwork/contracts#readme",
+    "devDependencies": {
+      "@nomiclabs/hardhat-ethers": "^2.0.2",
+      "@nomiclabs/hardhat-etherscan": "^2.1.2",
+      "@nomiclabs/hardhat-waffle": "^2.0.1",
+      "@typechain/ethers-v5": "^7.0.0",
+      "@typechain/hardhat": "^2.0.0",
+      "@types/chai": "^4.2.18",
+      "@types/chai-as-promised": "^7.1.4",
+      "@types/mocha": "^8.2.2",
+      "@types/node": "^15.0.3",
+      "chai": "^4.3.4",
+      "chai-as-promised": "^7.1.1",
+      "dotenv": "^9.0.2",
+      "ethereum-waffle": "^3.3.0",
+      "ethers": "^5.1.4",
+      "hardhat": "^2.2.1",
+      "ts-generator": "^0.1.1",
+      "ts-node": "^9.1.1",
+      "typechain": "^5.0.0",
+      "typescript": "^4.2.4"
+    },
+    "dependencies": {
+      "@openzeppelin/contracts": "^4.1.0",
+      "@uniswap/v2-core": "^1.0.1",
+      "@uniswap/v2-periphery": "^1.1.0-beta.0"
+    }
+  }
+
+yarn manifest: 
+  No manifest
+
+Lockfile: 
+  No lockfile
