@@ -38,14 +38,13 @@ contract BaiController is
         uint256 amountOut;
     }
 
-    IUniswapV2Router02 public immutable uniswapV2Router;
+    IUniswapV2Router02 public uniswapV2Router;
     // address public immutable uniswapV2Pair;
-    IERC20Upgradeable public constant WBTC =
-        IERC20Upgradeable(0x577D296678535e4903D59A4C929B718e1D575e0A); // rinkeby // mainnet: 0x2260fac5e5542a773aa44fbcfedf7c193bc2c599 //kovan: 0xd3A691C852CDB01E281545A27064741F0B7f6825
-    IERC20Upgradeable public constant USDC =
-        IERC20Upgradeable(0x4DBCdF9B62e891a7cec5A2568C3F4FAF9E8Abe2b); // rinkeby // mainnet: 0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48 //kovan: 0xb7a4F3E9097C08dA09517b5aB877F7a917224ede
-    address private constant UNISWAP_ROUTER =
-        0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
+    IERC20Upgradeable public WBTC; // =
+    // IERC20Upgradeable(0x577D296678535e4903D59A4C929B718e1D575e0A); // rinkeby // mainnet: 0x2260fac5e5542a773aa44fbcfedf7c193bc2c599 //kovan: 0xd3A691C852CDB01E281545A27064741F0B7f6825
+    IERC20Upgradeable public USDC; // =
+    // IERC20Upgradeable(0x4DBCdF9B62e891a7cec5A2568C3F4FAF9E8Abe2b); // rinkeby // mainnet: 0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48 //kovan: 0xb7a4F3E9097C08dA09517b5aB877F7a917224ede
+    // address private constant address(uniswapV2Router) = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
     address[] investors;
     mapping(address => Configuration) private configurations;
     mapping(address => uint256) private usdcBalance;
@@ -53,10 +52,10 @@ contract BaiController is
     mapping(address => Tx[]) private transactions;
     mapping(address => uint256) private lastTraded;
     mapping(address => bool) public exists;
-    uint256 public constant MIN_AMOUNT = 10**6 * 100; // min 100 USDC
+    uint256 public constant MIN_AMOUNT = 10**6 * 10; // min 10 USDC
     uint256 public constant DENOMINATOR = 1e4;
     bool swapInProgress = false;
-    uint8 public maxItemsPerStep = 1;
+    uint8 public maxItemsPerStep;
 
     event UserConfigured(
         address indexed user,
@@ -81,22 +80,24 @@ contract BaiController is
         _;
     }
 
-    constructor() {
+    function initialize(
+        address ownerAccount,
+        address wbtc,
+        address usdc,
+        address uniswapRouter
+    ) public initializer whenNotPaused {
+        require(ownerAccount != address(0), "BAI::constructor:Zero address");
+
+        WBTC = IERC20Upgradeable(wbtc);
+        USDC = IERC20Upgradeable(usdc);
+        maxItemsPerStep = 100;
+
         // mainnet
-        IUniswapV2Router02 _uniswapV2Router = IUniswapV2Router02(
-            UNISWAP_ROUTER
-        );
+        uniswapV2Router = IUniswapV2Router02(uniswapRouter);
         // uniswapV2Pair = IUniswapV2Factory(_uniswapV2Router.factory()).getPair(
         //     address(USDC),
         //     address(WBTC)
         // );
-
-        // set the rest of the contract variables
-        uniswapV2Router = _uniswapV2Router;
-    }
-
-    function initialize(address ownerAccount) public initializer whenNotPaused {
-        require(ownerAccount != address(0), "BAI::constructor:Zero address");
 
         _setupRole(DEFAULT_ADMIN_ROLE, ownerAccount);
 
@@ -194,12 +195,17 @@ contract BaiController is
 
         uint256 _allowanceOfUsdc = USDC.allowance(
             address(this),
-            UNISWAP_ROUTER
+            address(uniswapV2Router)
         );
-        uint256 _allowanceOfBtc = WBTC.allowance(address(this), UNISWAP_ROUTER);
+        uint256 _allowanceOfBtc = WBTC.allowance(
+            address(this),
+            address(uniswapV2Router)
+        );
 
-        if (_allowanceOfUsdc == 0) USDC.safeApprove(UNISWAP_ROUTER, 2**256 - 1); // infinity approval
-        if (_allowanceOfBtc == 0) WBTC.safeApprove(UNISWAP_ROUTER, 2**256 - 1); // infinity approval
+        if (_allowanceOfUsdc == 0)
+            USDC.safeApprove(address(uniswapV2Router), 2**256 - 1); // infinity approval
+        if (_allowanceOfBtc == 0)
+            WBTC.safeApprove(address(uniswapV2Router), 2**256 - 1); // infinity approval
 
         uint256 valOfUsdc = USDC.balanceOf(address(this)) >= usdcAmount
             ? usdcAmount
@@ -251,10 +257,10 @@ contract BaiController is
 
         uint256 _allowanceOfUsdc = USDC.allowance(
             address(this),
-            UNISWAP_ROUTER
+            address(uniswapV2Router)
         );
         if (_allowanceOfUsdc < totalUsdc)
-            USDC.safeApprove(UNISWAP_ROUTER, 2**256 - 1); // infinity approval
+            USDC.safeApprove(address(uniswapV2Router), 2**256 - 1); // infinity approval
 
         (address[] memory path, uint256 amountsOut) = findBestPath(totalUsdc);
         uint256[] memory outputs = uniswapV2Router.swapExactTokensForTokens(
