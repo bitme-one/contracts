@@ -23,7 +23,7 @@ contract BaiController is
     IBaiController,
     AccessControlUpgradeable,
     PausableUpgradeable,
-    KeeperCompatibleInterface
+    // KeeperCompatibleInterface
 {
     using SafeMathUpgradeable for uint256;
     using AddressUpgradeable for address;
@@ -235,8 +235,8 @@ contract BaiController is
     }
 
     function swap()
-        private
-        // override
+        external
+        override
         whenNotPaused
         whenNotSwapping
         returns (bool)
@@ -532,24 +532,24 @@ contract BaiController is
         return chainId;
     }
 
-    function checkUpkeep(
-        bytes calldata /* checkData */
-    )
-        external
-        override
-        returns (
-            bool upkeepNeeded,
-            bytes memory /*performData*/
-        )
-    {
-        (uint256 totalUsdc, , , , ) = prepare();
-        upkeepNeeded = (totalUsdc > 0);
-        // performData = hasNext;
-    }
+    // function checkUpkeep(
+    //     bytes calldata /* checkData */
+    // )
+    //     external
+    //     override
+    //     returns (
+    //         bool upkeepNeeded,
+    //         bytes memory /*performData*/
+    //     )
+    // {
+    //     (uint256 totalUsdc, , , , ) = prepare();
+    //     upkeepNeeded = (totalUsdc > 0);
+    //     // performData = hasNext;
+    // }
 
-    function performUpkeep(
-        bytes calldata /* performData */
-    ) external override {
-        swap();
-    }
+    // function performUpkeep(
+    //     bytes calldata /* performData */
+    // ) external override {
+    //     swap();
+    // }
 }
