@@ -20,5 +20,5 @@ interface IBaiController {
         external
         returns (bool);
 
-    function swap() external returns (bool);
+    // function swap() external returns (bool);
 }

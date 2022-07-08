@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.6;
+pragma solidity 0.8.7;
 
 import "hardhat/console.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
@@ -11,6 +11,7 @@ import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableMapUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/math/MathUpgradeable.sol";
+import "@chainlink/contracts/src/v0.8/interfaces/KeeperCompatibleInterface.sol";
 
 import "@uniswap/lib/contracts/libraries/TransferHelper.sol";
 import "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
@@ -21,7 +22,8 @@ import "../interfaces/IBaiController.sol";
 contract BaiController is
     IBaiController,
     AccessControlUpgradeable,
-    PausableUpgradeable
+    PausableUpgradeable,
+    KeeperCompatibleInterface
 {
     using SafeMathUpgradeable for uint256;
     using AddressUpgradeable for address;
@@ -233,8 +235,8 @@ contract BaiController is
     }
 
     function swap()
-        external
-        override
+        private
+        // override
         whenNotPaused
         whenNotSwapping
         returns (bool)
@@ -528,5 +530,26 @@ contract BaiController is
             chainId := chainid()
         }
         return chainId;
+    }
+
+    function checkUpkeep(
+        bytes calldata /* checkData */
+    )
+        external
+        override
+        returns (
+            bool upkeepNeeded,
+            bytes memory /*performData*/
+        )
+    {
+        (uint256 totalUsdc, , , , ) = prepare();
+        upkeepNeeded = (totalUsdc > 0);
+        // performData = hasNext;
+    }
+
+    function performUpkeep(
+        bytes calldata /* performData */
+    ) external override {
+        swap();
     }
 }
