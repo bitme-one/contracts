@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.7;
+pragma abicoder v2;
 
-import "hardhat/console.sol";
+// import "hardhat/console.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
@@ -11,19 +12,20 @@ import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableMapUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/math/MathUpgradeable.sol";
-import "@chainlink/contracts/src/v0.8/interfaces/KeeperCompatibleInterface.sol";
 
 import "@uniswap/lib/contracts/libraries/TransferHelper.sol";
-import "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
-import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol";
+import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
+import "@uniswap/v3-periphery/contracts/interfaces/IPeripheryImmutableState.sol";
+import "@uniswap/v3-periphery/contracts/interfaces/IQuoter.sol";
+// import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
 
 import "../interfaces/IBaiController.sol";
 
 contract BaiController is
     IBaiController,
     AccessControlUpgradeable,
-    PausableUpgradeable,
-    // KeeperCompatibleInterface
+    PausableUpgradeable
 {
     using SafeMathUpgradeable for uint256;
     using AddressUpgradeable for address;
@@ -40,13 +42,15 @@ contract BaiController is
         uint256 amountOut;
     }
 
-    IUniswapV2Router02 public uniswapV2Router;
+    ISwapRouter public swapRouter;
+    IUniswapV3Pool public pool;
+    IQuoter public quoter;
     // address public immutable uniswapV2Pair;
     IERC20Upgradeable public WBTC; // =
     // IERC20Upgradeable(0x577D296678535e4903D59A4C929B718e1D575e0A); // rinkeby // mainnet: 0x2260fac5e5542a773aa44fbcfedf7c193bc2c599 //kovan: 0xd3A691C852CDB01E281545A27064741F0B7f6825
     IERC20Upgradeable public USDC; // =
     // IERC20Upgradeable(0x4DBCdF9B62e891a7cec5A2568C3F4FAF9E8Abe2b); // rinkeby // mainnet: 0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48 //kovan: 0xb7a4F3E9097C08dA09517b5aB877F7a917224ede
-    // address private constant address(uniswapV2Router) = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
+    // address private constant address(swapRouter) = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
     address[] investors;
     mapping(address => Configuration) private configurations;
     mapping(address => uint256) private usdcBalance;
@@ -86,7 +90,8 @@ contract BaiController is
         address ownerAccount,
         address wbtc,
         address usdc,
-        address uniswapRouter
+        address uniswapRouter,
+        address quoterAddress
     ) public initializer whenNotPaused {
         require(ownerAccount != address(0), "BAI::constructor:Zero address");
 
@@ -95,8 +100,9 @@ contract BaiController is
         maxItemsPerStep = 100;
 
         // mainnet
-        uniswapV2Router = IUniswapV2Router02(uniswapRouter);
-        // uniswapV2Pair = IUniswapV2Factory(_uniswapV2Router.factory()).getPair(
+        swapRouter = ISwapRouter(uniswapRouter);
+        quoter = IQuoter(quoterAddress);
+        // uniswapV2Pair = IUniswapV2Factory(_swapRouter.factory()).getPair(
         //     address(USDC),
         //     address(WBTC)
         // );
@@ -111,7 +117,7 @@ contract BaiController is
         _unpause();
     }
 
-    //to recieve ETH from uniswapV2Router when swaping
+    //to recieve ETH from swapRouter when swaping
     receive() external payable {}
 
     function kill() external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -197,17 +203,17 @@ contract BaiController is
 
         uint256 _allowanceOfUsdc = USDC.allowance(
             address(this),
-            address(uniswapV2Router)
+            address(swapRouter)
         );
         uint256 _allowanceOfBtc = WBTC.allowance(
             address(this),
-            address(uniswapV2Router)
+            address(swapRouter)
         );
 
         if (_allowanceOfUsdc == 0)
-            USDC.safeApprove(address(uniswapV2Router), 2**256 - 1); // infinity approval
+            USDC.safeApprove(address(swapRouter), 2**256 - 1); // infinity approval
         if (_allowanceOfBtc == 0)
-            WBTC.safeApprove(address(uniswapV2Router), 2**256 - 1); // infinity approval
+            WBTC.safeApprove(address(swapRouter), 2**256 - 1); // infinity approval
 
         uint256 valOfUsdc = USDC.balanceOf(address(this)) >= usdcAmount
             ? usdcAmount
@@ -259,20 +265,23 @@ contract BaiController is
 
         uint256 _allowanceOfUsdc = USDC.allowance(
             address(this),
-            address(uniswapV2Router)
+            address(swapRouter)
         );
         if (_allowanceOfUsdc < totalUsdc)
-            USDC.safeApprove(address(uniswapV2Router), 2**256 - 1); // infinity approval
+            USDC.safeApprove(address(swapRouter), 2**256 - 1); // infinity approval
 
-        (address[] memory path, uint256 amountsOut) = findBestPath(totalUsdc);
-        uint256[] memory outputs = uniswapV2Router.swapExactTokensForTokens(
-            totalUsdc,
-            amountsOut,
-            path,
-            address(this),
-            block.timestamp + 30 seconds
-        );
-        uint256 amountOfBTC = outputs[outputs.length - 1];
+        (bool isMultihop, uint256 amountsOut) = findBestPath(totalUsdc);
+
+        uint256 amountOfBTC;
+        if (isMultihop) {
+            amountOfBTC = swapRouter.exactInput(
+                getMultihopParams(totalUsdc, amountsOut)
+            );
+        } else {
+            amountOfBTC = swapRouter.exactInputSingle(
+                getSingleParams(totalUsdc, amountsOut)
+            );
+        }
 
         for (uint256 i = 0; i < activeInvestors.length; i++) {
             address investor = activeInvestors[i];
@@ -300,29 +309,69 @@ contract BaiController is
         return hasNext;
     }
 
-    function findBestPath(uint256 amountsIn)
-        private
+    function getMultihopParams(uint256 amountsIn, uint256 amountInMaximum)
+        public
         view
-        returns (address[] memory path, uint256 amountsOut)
+        returns (ISwapRouter.ExactInputParams memory)
     {
-        address[] memory path1 = new address[](2);
-        path1[0] = address(USDC);
-        path1[1] = address(WBTC);
-        uint256[] memory results = uniswapV2Router.getAmountsOut(
+        return
+            ISwapRouter.ExactInputParams({
+                path: getEncodedPath(),
+                recipient: address(this),
+                deadline: block.timestamp,
+                amountIn: amountsIn,
+                amountOutMinimum: amountInMaximum
+            });
+    }
+
+    function getSingleParams(uint256 amountsIn, uint256 amountInMaximum)
+        public
+        view
+        returns (ISwapRouter.ExactInputSingleParams memory)
+    {
+        return
+            ISwapRouter.ExactInputSingleParams({
+                tokenIn: address(USDC),
+                tokenOut: address(WBTC),
+                fee: 3000,
+                recipient: address(this),
+                deadline: block.timestamp,
+                amountIn: amountsIn,
+                amountOutMinimum: amountInMaximum,
+                sqrtPriceLimitX96: 0
+            });
+    }
+
+    function findBestPath(uint256 amountsIn)
+        public
+        returns (bool isMultihop, uint256 amountsOut)
+    {
+        uint256 singleQuote = quoter.quoteExactInputSingle(
+            address(USDC),
+            address(WBTC),
+            uint24(3000), //fee
             amountsIn,
-            path1
+            0 // sqrtPriceLimitX96
         );
-        uint256 amountOfBTC1 = results[results.length - 1];
 
-        address[] memory path2 = new address[](3);
-        path2[0] = address(USDC);
-        path2[1] = uniswapV2Router.WETH();
-        path2[2] = address(WBTC);
-        results = uniswapV2Router.getAmountsOut(amountsIn, path2);
-        uint256 amountOfBTC2 = results[results.length - 1];
+        uint256 multihopQuote = quoter.quoteExactInput(
+            getEncodedPath(),
+            amountsIn
+        );
 
-        path = amountOfBTC2 > amountOfBTC1 ? path2 : path1;
-        amountsOut = MathUpgradeable.max(amountOfBTC1, amountOfBTC2);
+        isMultihop = multihopQuote > singleQuote ? true : false;
+        amountsOut = MathUpgradeable.max(singleQuote, multihopQuote);
+    }
+
+    function getEncodedPath() public view returns (bytes memory) {
+        return
+            abi.encodePacked(
+                address(USDC),
+                uint24(500),
+                IPeripheryImmutableState(address(swapRouter)).WETH9(),
+                uint24(3000),
+                address(WBTC)
+            );
     }
 
     function prepare()

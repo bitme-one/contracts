@@ -31,14 +31,7 @@ abstract contract Proxy {
 
             // Call the implementation.
             // out and outsize are 0 because we don't know the size yet.
-            let result := delegatecall(
-                gas(),
-                implementation,
-                0,
-                calldatasize(),
-                0,
-                0
-            )
+            let result := delegatecall(gas(), implementation, 0, calldatasize(), 0, 0)
 
             // Copy the returned data.
             returndatacopy(0, 0, returndatasize())
@@ -95,7 +88,10 @@ abstract contract Proxy {
     function _beforeFallback() internal virtual {}
 }
 
+
 // File @openzeppelin/contracts/proxy/beacon/IBeacon.sol@v4.3.1
+
+// SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.0;
 
@@ -111,7 +107,10 @@ interface IBeacon {
     function implementation() external view returns (address);
 }
 
+
 // File @openzeppelin/contracts/utils/Address.sol@v4.3.1
+
+// SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.0;
 
@@ -165,16 +164,10 @@ library Address {
      * https://solidity.readthedocs.io/en/v0.5.11/security-considerations.html#use-the-checks-effects-interactions-pattern[checks-effects-interactions pattern].
      */
     function sendValue(address payable recipient, uint256 amount) internal {
-        require(
-            address(this).balance >= amount,
-            "Address: insufficient balance"
-        );
+        require(address(this).balance >= amount, "Address: insufficient balance");
 
         (bool success, ) = recipient.call{value: amount}("");
-        require(
-            success,
-            "Address: unable to send value, recipient may have reverted"
-        );
+        require(success, "Address: unable to send value, recipient may have reverted");
     }
 
     /**
@@ -195,10 +188,7 @@ library Address {
      *
      * _Available since v3.1._
      */
-    function functionCall(address target, bytes memory data)
-        internal
-        returns (bytes memory)
-    {
+    function functionCall(address target, bytes memory data) internal returns (bytes memory) {
         return functionCall(target, data, "Address: low-level call failed");
     }
 
@@ -232,13 +222,7 @@ library Address {
         bytes memory data,
         uint256 value
     ) internal returns (bytes memory) {
-        return
-            functionCallWithValue(
-                target,
-                data,
-                value,
-                "Address: low-level call with value failed"
-            );
+        return functionCallWithValue(target, data, value, "Address: low-level call with value failed");
     }
 
     /**
@@ -253,15 +237,10 @@ library Address {
         uint256 value,
         string memory errorMessage
     ) internal returns (bytes memory) {
-        require(
-            address(this).balance >= value,
-            "Address: insufficient balance for call"
-        );
+        require(address(this).balance >= value, "Address: insufficient balance for call");
         require(isContract(target), "Address: call to non-contract");
 
-        (bool success, bytes memory returndata) = target.call{value: value}(
-            data
-        );
+        (bool success, bytes memory returndata) = target.call{value: value}(data);
         return verifyCallResult(success, returndata, errorMessage);
     }
 
@@ -271,17 +250,8 @@ library Address {
      *
      * _Available since v3.3._
      */
-    function functionStaticCall(address target, bytes memory data)
-        internal
-        view
-        returns (bytes memory)
-    {
-        return
-            functionStaticCall(
-                target,
-                data,
-                "Address: low-level static call failed"
-            );
+    function functionStaticCall(address target, bytes memory data) internal view returns (bytes memory) {
+        return functionStaticCall(target, data, "Address: low-level static call failed");
     }
 
     /**
@@ -307,16 +277,8 @@ library Address {
      *
      * _Available since v3.4._
      */
-    function functionDelegateCall(address target, bytes memory data)
-        internal
-        returns (bytes memory)
-    {
-        return
-            functionDelegateCall(
-                target,
-                data,
-                "Address: low-level delegate call failed"
-            );
+    function functionDelegateCall(address target, bytes memory data) internal returns (bytes memory) {
+        return functionDelegateCall(target, data, "Address: low-level delegate call failed");
     }
 
     /**
@@ -365,7 +327,10 @@ library Address {
     }
 }
 
+
 // File @openzeppelin/contracts/utils/StorageSlot.sol@v4.3.1
+
+// SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.0;
 
@@ -415,11 +380,7 @@ library StorageSlot {
     /**
      * @dev Returns an `AddressSlot` with member `value` located at `slot`.
      */
-    function getAddressSlot(bytes32 slot)
-        internal
-        pure
-        returns (AddressSlot storage r)
-    {
+    function getAddressSlot(bytes32 slot) internal pure returns (AddressSlot storage r) {
         assembly {
             r.slot := slot
         }
@@ -428,11 +389,7 @@ library StorageSlot {
     /**
      * @dev Returns an `BooleanSlot` with member `value` located at `slot`.
      */
-    function getBooleanSlot(bytes32 slot)
-        internal
-        pure
-        returns (BooleanSlot storage r)
-    {
+    function getBooleanSlot(bytes32 slot) internal pure returns (BooleanSlot storage r) {
         assembly {
             r.slot := slot
         }
@@ -441,11 +398,7 @@ library StorageSlot {
     /**
      * @dev Returns an `Bytes32Slot` with member `value` located at `slot`.
      */
-    function getBytes32Slot(bytes32 slot)
-        internal
-        pure
-        returns (Bytes32Slot storage r)
-    {
+    function getBytes32Slot(bytes32 slot) internal pure returns (Bytes32Slot storage r) {
         assembly {
             r.slot := slot
         }
@@ -454,20 +407,21 @@ library StorageSlot {
     /**
      * @dev Returns an `Uint256Slot` with member `value` located at `slot`.
      */
-    function getUint256Slot(bytes32 slot)
-        internal
-        pure
-        returns (Uint256Slot storage r)
-    {
+    function getUint256Slot(bytes32 slot) internal pure returns (Uint256Slot storage r) {
         assembly {
             r.slot := slot
         }
     }
 }
 
+
 // File @openzeppelin/contracts/proxy/ERC1967/ERC1967Upgrade.sol@v4.3.1
 
+// SPDX-License-Identifier: MIT
+
 pragma solidity ^0.8.2;
+
+
 
 /**
  * @dev This abstract contract provides getters and event emitting update functions for
@@ -479,16 +433,14 @@ pragma solidity ^0.8.2;
  */
 abstract contract ERC1967Upgrade {
     // This is the keccak-256 hash of "eip1967.proxy.rollback" subtracted by 1
-    bytes32 private constant _ROLLBACK_SLOT =
-        0x4910fdfa16fed3260ed0e7147f7cc6da11a60208b5b9406d12a635614ffd9143;
+    bytes32 private constant _ROLLBACK_SLOT = 0x4910fdfa16fed3260ed0e7147f7cc6da11a60208b5b9406d12a635614ffd9143;
 
     /**
      * @dev Storage slot with the address of the current implementation.
      * This is the keccak-256 hash of "eip1967.proxy.implementation" subtracted by 1, and is
      * validated in the constructor.
      */
-    bytes32 internal constant _IMPLEMENTATION_SLOT =
-        0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
+    bytes32 internal constant _IMPLEMENTATION_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
 
     /**
      * @dev Emitted when the implementation is upgraded.
@@ -506,13 +458,8 @@ abstract contract ERC1967Upgrade {
      * @dev Stores a new address in the EIP1967 implementation slot.
      */
     function _setImplementation(address newImplementation) private {
-        require(
-            Address.isContract(newImplementation),
-            "ERC1967: new implementation is not a contract"
-        );
-        StorageSlot
-            .getAddressSlot(_IMPLEMENTATION_SLOT)
-            .value = newImplementation;
+        require(Address.isContract(newImplementation), "ERC1967: new implementation is not a contract");
+        StorageSlot.getAddressSlot(_IMPLEMENTATION_SLOT).value = newImplementation;
     }
 
     /**
@@ -560,8 +507,7 @@ abstract contract ERC1967Upgrade {
         }
 
         // Perform rollback test if not already in progress
-        StorageSlot.BooleanSlot storage rollbackTesting = StorageSlot
-            .getBooleanSlot(_ROLLBACK_SLOT);
+        StorageSlot.BooleanSlot storage rollbackTesting = StorageSlot.getBooleanSlot(_ROLLBACK_SLOT);
         if (!rollbackTesting.value) {
             // Trigger rollback using upgradeTo from the new implementation
             rollbackTesting.value = true;
@@ -571,10 +517,7 @@ abstract contract ERC1967Upgrade {
             );
             rollbackTesting.value = false;
             // Check rollback was effective
-            require(
-                oldImplementation == _getImplementation(),
-                "ERC1967Upgrade: upgrade breaks further upgrades"
-            );
+            require(oldImplementation == _getImplementation(), "ERC1967Upgrade: upgrade breaks further upgrades");
             // Finally reset to the new implementation and log the upgrade
             _upgradeTo(newImplementation);
         }
@@ -585,8 +528,7 @@ abstract contract ERC1967Upgrade {
      * This is the keccak-256 hash of "eip1967.proxy.admin" subtracted by 1, and is
      * validated in the constructor.
      */
-    bytes32 internal constant _ADMIN_SLOT =
-        0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
+    bytes32 internal constant _ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
 
     /**
      * @dev Emitted when the admin account has changed.
@@ -604,10 +546,7 @@ abstract contract ERC1967Upgrade {
      * @dev Stores a new address in the EIP1967 admin slot.
      */
     function _setAdmin(address newAdmin) private {
-        require(
-            newAdmin != address(0),
-            "ERC1967: new admin is the zero address"
-        );
+        require(newAdmin != address(0), "ERC1967: new admin is the zero address");
         StorageSlot.getAddressSlot(_ADMIN_SLOT).value = newAdmin;
     }
 
@@ -625,8 +564,7 @@ abstract contract ERC1967Upgrade {
      * @dev The storage slot of the UpgradeableBeacon contract which defines the implementation for this proxy.
      * This is bytes32(uint256(keccak256('eip1967.proxy.beacon')) - 1)) and is validated in the constructor.
      */
-    bytes32 internal constant _BEACON_SLOT =
-        0xa3f0ad74e5423aebfd80d3ef4346578335a9a72aeaee59ff6cb3582b35133d50;
+    bytes32 internal constant _BEACON_SLOT = 0xa3f0ad74e5423aebfd80d3ef4346578335a9a72aeaee59ff6cb3582b35133d50;
 
     /**
      * @dev Emitted when the beacon is upgraded.
@@ -644,10 +582,7 @@ abstract contract ERC1967Upgrade {
      * @dev Stores a new beacon in the EIP1967 beacon slot.
      */
     function _setBeacon(address newBeacon) private {
-        require(
-            Address.isContract(newBeacon),
-            "ERC1967: new beacon is not a contract"
-        );
+        require(Address.isContract(newBeacon), "ERC1967: new beacon is not a contract");
         require(
             Address.isContract(IBeacon(newBeacon).implementation()),
             "ERC1967: beacon implementation is not a contract"
@@ -669,17 +604,18 @@ abstract contract ERC1967Upgrade {
         _setBeacon(newBeacon);
         emit BeaconUpgraded(newBeacon);
         if (data.length > 0 || forceCall) {
-            Address.functionDelegateCall(
-                IBeacon(newBeacon).implementation(),
-                data
-            );
+            Address.functionDelegateCall(IBeacon(newBeacon).implementation(), data);
         }
     }
 }
 
+
 // File @openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol@v4.3.1
 
+// SPDX-License-Identifier: MIT
+
 pragma solidity ^0.8.0;
+
 
 /**
  * @dev This contract implements an upgradeable proxy. It is upgradeable because calls are delegated to an
@@ -695,28 +631,22 @@ contract ERC1967Proxy is Proxy, ERC1967Upgrade {
      * function call, and allows initializating the storage of the proxy like a Solidity constructor.
      */
     constructor(address _logic, bytes memory _data) payable {
-        assert(
-            _IMPLEMENTATION_SLOT ==
-                bytes32(uint256(keccak256("eip1967.proxy.implementation")) - 1)
-        );
+        assert(_IMPLEMENTATION_SLOT == bytes32(uint256(keccak256("eip1967.proxy.implementation")) - 1));
         _upgradeToAndCall(_logic, _data, false);
     }
 
     /**
      * @dev Returns the current implementation address.
      */
-    function _implementation()
-        internal
-        view
-        virtual
-        override
-        returns (address impl)
-    {
+    function _implementation() internal view virtual override returns (address impl) {
         return ERC1967Upgrade._getImplementation();
     }
 }
 
+
 // File @openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol@v4.3.1
+
+// SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.0;
 
@@ -751,10 +681,7 @@ contract TransparentUpgradeableProxy is ERC1967Proxy {
         address admin_,
         bytes memory _data
     ) payable ERC1967Proxy(_logic, _data) {
-        assert(
-            _ADMIN_SLOT ==
-                bytes32(uint256(keccak256("eip1967.proxy.admin")) - 1)
-        );
+        assert(_ADMIN_SLOT == bytes32(uint256(keccak256("eip1967.proxy.admin")) - 1));
         _changeAdmin(admin_);
     }
 
@@ -791,11 +718,7 @@ contract TransparentUpgradeableProxy is ERC1967Proxy {
      * https://eth.wiki/json-rpc/API#eth_getstorageat[`eth_getStorageAt`] RPC call.
      * `0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc`
      */
-    function implementation()
-        external
-        ifAdmin
-        returns (address implementation_)
-    {
+    function implementation() external ifAdmin returns (address implementation_) {
         implementation_ = _implementation();
     }
 
@@ -826,11 +749,7 @@ contract TransparentUpgradeableProxy is ERC1967Proxy {
      *
      * NOTE: Only the admin can call this function. See {ProxyAdmin-upgradeAndCall}.
      */
-    function upgradeToAndCall(address newImplementation, bytes calldata data)
-        external
-        payable
-        ifAdmin
-    {
+    function upgradeToAndCall(address newImplementation, bytes calldata data) external payable ifAdmin {
         _upgradeToAndCall(newImplementation, data, true);
     }
 
@@ -845,15 +764,15 @@ contract TransparentUpgradeableProxy is ERC1967Proxy {
      * @dev Makes sure the admin cannot access the fallback function. See {Proxy-_beforeFallback}.
      */
     function _beforeFallback() internal virtual override {
-        require(
-            msg.sender != _getAdmin(),
-            "TransparentUpgradeableProxy: admin cannot fallback to proxy target"
-        );
+        require(msg.sender != _getAdmin(), "TransparentUpgradeableProxy: admin cannot fallback to proxy target");
         super._beforeFallback();
     }
 }
 
+
 // File @openzeppelin/contracts/utils/Context.sol@v4.3.1
+
+// SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.0;
 
@@ -877,9 +796,12 @@ abstract contract Context {
     }
 }
 
+
 // File contracts/BaiProxy.sol
 
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.2;
+
 
 contract MyProxy is Context, TransparentUpgradeableProxy {
     constructor(address _logic)
