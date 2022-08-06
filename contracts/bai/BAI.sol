@@ -20,7 +20,28 @@ import "@uniswap/v3-periphery/contracts/interfaces/IPeripheryImmutableState.sol"
 import "@uniswap/v3-periphery/contracts/interfaces/IQuoter.sol";
 // import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
 
-import "../interfaces/IBaiController.sol";
+enum Frequency {
+    UNKNOWN, //0
+    DAILY, // 1
+    WEEKLY, // 2
+    BIWEEKLY, // 3
+    MONTHLY, // 4
+    // FOR DEVELOPMENT ONLY
+    HOURLY, // 5
+    PERMINUTE //6
+}
+
+interface IBaiController {
+    function config(Frequency frequency, uint256 amountPerTime) external;
+
+    function deposit(uint256 amount) external;
+
+    function withdraw(uint256 usdcAmount, uint256 btcAmount)
+        external
+        returns (bool);
+
+    function swap() external returns (bool);
+}
 
 contract BaiController is
     IBaiController,
@@ -128,6 +149,14 @@ contract BaiController is
         selfdestruct(payable(_msgSender()));
     }
 
+    function setSwapRouter(address _router)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        require(address(swapRouter) != _router, "no change");
+        swapRouter = ISwapRouter(_router);
+    }
+
     function setMaxItemPerStep(uint8 step)
         external
         onlyRole(DEFAULT_ADMIN_ROLE)
@@ -145,7 +174,7 @@ contract BaiController is
         require(
             frequency > Frequency.UNKNOWN &&
                 frequency <=
-                (block.chainid == 1 ? Frequency.MONTHLY : Frequency.PERMINUTE),
+                (block.chainid == 10 ? Frequency.MONTHLY : Frequency.PERMINUTE),
             "invalid frequency"
         );
 
