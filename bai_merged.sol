@@ -2571,10 +2571,27 @@ interface IQuoter {
 }
 
 
-// File contracts/interfaces/IBaiController.sol
+// File contracts/bai/BAI.sol
 
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.7;
+pragma solidity 0.8.7;
+pragma abicoder v2;
+
+// import "hardhat/console.sol";
+
+
+
+
+
+
+
+
+
+
+
+
+
+// import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
 
 enum Frequency {
     UNKNOWN, //0
@@ -2598,29 +2615,6 @@ interface IBaiController {
 
     function swap() external returns (bool);
 }
-
-
-// File contracts/bai/BAI.sol
-
-// SPDX-License-Identifier: MIT
-pragma solidity 0.8.7;
-pragma abicoder v2;
-
-// import "hardhat/console.sol";
-
-
-
-
-
-
-
-
-
-
-
-
-
-// import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
 
 contract BaiController is
     IBaiController,
@@ -2662,6 +2656,9 @@ contract BaiController is
     uint256 public constant DENOMINATOR = 1e4;
     bool swapInProgress = false;
     uint8 public maxItemsPerStep;
+    uint16 public fee = 10; // by default 0.1%;
+    address public feeCollector;
+    uint256 public totalFees = 0;
 
     event UserConfigured(
         address indexed user,
@@ -2680,9 +2677,15 @@ contract BaiController is
         uint256 amountofUsdc,
         uint256 amountOfBtc
     );
+    event FeeCollected(address indexed collector, uint256 totalFees);
 
     modifier whenNotSwapping() {
         require(!swapInProgress, "Swap in progress.");
+        _;
+    }
+
+    modifier onlyFeeCollector() {
+        require(_msgSender() == feeCollector, "collector required");
         _;
     }
 
@@ -2728,11 +2731,46 @@ contract BaiController is
         selfdestruct(payable(_msgSender()));
     }
 
+    function setSwapRouter(address _router)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        require(address(swapRouter) != _router, "no change");
+        swapRouter = ISwapRouter(_router);
+    }
+
     function setMaxItemPerStep(uint8 step)
         external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
         maxItemsPerStep = step;
+    }
+
+    function setFee(uint16 newFee) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(newFee != fee, "no change");
+        fee = newFee;
+    }
+
+    function setFeeCollector(address _newFeeCollector)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        require(_newFeeCollector != address(0), "zero address");
+        require(_newFeeCollector != feeCollector, "no change");
+        feeCollector = _newFeeCollector;
+    }
+
+    function collectFees() external onlyFeeCollector {
+        require(totalFees > 0, "no fee");
+        require(feeCollector != address(0), "feeCollector is zero");
+        uint256 balance = WBTC.balanceOf(address(this));
+        if (balance >= totalFees) WBTC.safeTransfer(feeCollector, totalFees);
+        else WBTC.safeTransfer(feeCollector, balance);
+
+        emit FeeCollected(
+            feeCollector,
+            balance < totalFees ? balance : totalFees
+        );
     }
 
     function config(Frequency frequency, uint256 amountPerTime)
@@ -2745,7 +2783,7 @@ contract BaiController is
         require(
             frequency > Frequency.UNKNOWN &&
                 frequency <=
-                (block.chainid == 1 ? Frequency.MONTHLY : Frequency.PERMINUTE),
+                (block.chainid == 10 ? Frequency.MONTHLY : Frequency.PERMINUTE),
             "invalid frequency"
         );
 
@@ -2883,6 +2921,8 @@ contract BaiController is
             );
         }
 
+        amountOfBTC = deductFees(amountOfBTC);
+
         for (uint256 i = 0; i < activeInvestors.length; i++) {
             address investor = activeInvestors[i];
             uint256 userBTC = amountOfBTC.mul(percentages[i]).div(DENOMINATOR);
@@ -2907,6 +2947,10 @@ contract BaiController is
 
         swapInProgress = false;
         return hasNext;
+    }
+
+    function deductFees(uint256 amountOfBTC) private view returns (uint256) {
+        return (amountOfBTC * (DENOMINATOR - fee)) / DENOMINATOR;
     }
 
     function getMultihopParams(uint256 amountsIn, uint256 amountInMaximum)

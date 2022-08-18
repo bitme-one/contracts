@@ -9,8 +9,6 @@ import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableMapUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/math/MathUpgradeable.sol";
 
 import "@uniswap/lib/contracts/libraries/TransferHelper.sol";
@@ -196,7 +194,7 @@ contract BaiController is
 
         emit FeeCollected(
             feeCollector,
-            balance < totalFees ? balance : totalFees
+            MathUpgradeable.min(balance, totalFees)
         );
     }
 
