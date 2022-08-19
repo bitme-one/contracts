@@ -374,8 +374,9 @@ contract BaiController is
         return hasNext;
     }
 
-    function deductFees(uint256 amountOfBTC) private view returns (uint256) {
-        return (amountOfBTC * (DENOMINATOR - fee)) / DENOMINATOR;
+    function deductFees(uint256 amountOfBTC) private returns (uint256 leftBTC) {
+        leftBTC = (amountOfBTC.mul(DENOMINATOR.sub(fee))).div(DENOMINATOR);
+        totalFees = totalFees.add(amountOfBTC.sub(leftBTC));
     }
 
     function getMultihopParams(uint256 amountsIn, uint256 amountInMaximum)
