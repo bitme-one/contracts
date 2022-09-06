@@ -44,7 +44,6 @@ contract BaiController is
     PausableUpgradeable
 {
     using SafeERC20Upgradeable for IERC20Upgradeable;
-    using ArrayHelper
     struct Configuration {
         Frequency frequency;
         uint256 amountPerTime;
