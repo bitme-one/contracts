@@ -1,18 +1,15 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.7;
 pragma abicoder v2;
 
 // import "hardhat/console.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/math/MathUpgradeable.sol";
 
-import "@uniswap/lib/contracts/libraries/TransferHelper.sol";
-import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+// import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
 import "@uniswap/v3-periphery/contracts/interfaces/IPeripheryImmutableState.sol";
 import "@uniswap/v3-periphery/contracts/interfaces/IQuoter.sol";
@@ -46,10 +43,8 @@ contract BaiController is
     AccessControlUpgradeable,
     PausableUpgradeable
 {
-    using SafeMathUpgradeable for uint256;
-    using AddressUpgradeable for address;
     using SafeERC20Upgradeable for IERC20Upgradeable;
-
+    using ArrayHelper
     struct Configuration {
         Frequency frequency;
         uint256 amountPerTime;
@@ -62,7 +57,7 @@ contract BaiController is
     }
 
     ISwapRouter public swapRouter;
-    IUniswapV3Pool public pool;
+    address public pool;
     IQuoter public quoter;
     // address public immutable uniswapV2Pair;
     IERC20Upgradeable public WBTC; // =
@@ -84,6 +79,7 @@ contract BaiController is
     uint16 public fee = 10; // by default 0.1%;
     address public feeCollector;
     uint256 public totalFees = 0;
+    uint24[2][] public multihopFees = [[500, 500], [500, 3000]];
 
     event UserConfigured(
         address indexed user,
@@ -103,6 +99,7 @@ contract BaiController is
         uint256 amountOfBtc
     );
     event FeeCollected(address indexed collector, uint256 totalFees);
+    event PathFound(uint24[2] fees, uint256 amountsOut);
 
     modifier whenNotSwapping() {
         require(!swapInProgress, "Swap in progress.");
@@ -130,10 +127,6 @@ contract BaiController is
         // mainnet
         swapRouter = ISwapRouter(uniswapRouter);
         quoter = IQuoter(quoterAddress);
-        // uniswapV2Pair = IUniswapV2Factory(_swapRouter.factory()).getPair(
-        //     address(USDC),
-        //     address(WBTC)
-        // );
 
         _setupRole(DEFAULT_ADMIN_ROLE, ownerAccount);
 
@@ -154,6 +147,13 @@ contract BaiController is
         balance = WBTC.balanceOf(address(this));
         if (balance > 0) WBTC.safeTransfer(_msgSender(), balance);
         selfdestruct(payable(_msgSender()));
+    }
+
+    function setMultihopFees(uint24[2][] memory _fees)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        multihopFees = _fees;
     }
 
     function setSwapRouter(address _router)
@@ -239,7 +239,7 @@ contract BaiController is
         );
         USDC.safeTransferFrom(address(user), address(this), amountOfUSDC);
 
-        usdcBalance[user] = usdcBalance[user].add(amountOfUSDC);
+        usdcBalance[user] = usdcBalance[user] + (amountOfUSDC);
         emit UserToppedUp(user, amountOfUSDC);
     }
 
@@ -289,9 +289,9 @@ contract BaiController is
         if (valOfBtc > 0) WBTC.safeTransfer(_user, valOfBtc);
 
         if (usdcBalance[_user] == 0) delete usdcBalance[_user];
-        else usdcBalance[_user] = usdcBalance[_user].sub(usdcAmount);
+        else usdcBalance[_user] = usdcBalance[_user] - (usdcAmount);
         if (btcBalance[_user] == 0) delete btcBalance[_user];
-        else btcBalance[_user] = btcBalance[_user].sub(btcAmount);
+        else btcBalance[_user] = btcBalance[_user] - (btcAmount);
 
         if (usdcBalance[_user] == 0 && btcBalance[_user] == 0) {
             delete configurations[_user];
@@ -333,12 +333,16 @@ contract BaiController is
         if (_allowanceOfUsdc < totalUsdc)
             USDC.safeApprove(address(swapRouter), 2**256 - 1); // infinity approval
 
-        (bool isMultihop, uint256 amountsOut) = findBestPath(totalUsdc);
+        (
+            bool isMultihop,
+            uint256 amountsOut,
+            uint24[2] memory fees
+        ) = findBestPath(totalUsdc);
 
         uint256 amountOfBTC;
         if (isMultihop) {
             amountOfBTC = swapRouter.exactInput(
-                getMultihopParams(totalUsdc, amountsOut)
+                getMultihopParams(totalUsdc, amountsOut, fees)
             );
         } else {
             amountOfBTC = swapRouter.exactInputSingle(
@@ -350,7 +354,7 @@ contract BaiController is
 
         for (uint256 i = 0; i < activeInvestors.length; i++) {
             address investor = activeInvestors[i];
-            uint256 userBTC = amountOfBTC.mul(percentages[i]).div(DENOMINATOR);
+            uint256 userBTC = (amountOfBTC * (percentages[i])) / (DENOMINATOR);
 
             // add tx
             Tx memory _tx = Tx({
@@ -364,8 +368,8 @@ contract BaiController is
             lastTraded[investor] = block.timestamp;
 
             // update balance
-            usdcBalance[investor] = usdcBalance[investor].sub(amounts[i]);
-            btcBalance[investor] = btcBalance[investor].add(userBTC);
+            usdcBalance[investor] = usdcBalance[investor] - (amounts[i]);
+            btcBalance[investor] = btcBalance[investor] + (userBTC);
         }
 
         emit Swapped(address(USDC), totalUsdc, address(WBTC), amountOfBTC);
@@ -375,26 +379,26 @@ contract BaiController is
     }
 
     function deductFees(uint256 amountOfBTC) private returns (uint256 leftBTC) {
-        leftBTC = (amountOfBTC.mul(DENOMINATOR.sub(fee))).div(DENOMINATOR);
-        totalFees = totalFees.add(amountOfBTC.sub(leftBTC));
+        leftBTC = (amountOfBTC * (DENOMINATOR - (fee))) / (DENOMINATOR);
+        totalFees = totalFees + (amountOfBTC - (leftBTC));
     }
 
-    function getMultihopParams(uint256 amountsIn, uint256 amountInMaximum)
-        public
-        view
-        returns (ISwapRouter.ExactInputParams memory)
-    {
+    function getMultihopParams(
+        uint256 amountsIn,
+        uint256 amountOutMinimum,
+        uint24[2] memory fees
+    ) public view returns (ISwapRouter.ExactInputParams memory) {
         return
             ISwapRouter.ExactInputParams({
-                path: getEncodedPath(),
+                path: getEncodedPath(fees),
                 recipient: address(this),
                 deadline: block.timestamp,
                 amountIn: amountsIn,
-                amountOutMinimum: amountInMaximum
+                amountOutMinimum: amountOutMinimum
             });
     }
 
-    function getSingleParams(uint256 amountsIn, uint256 amountInMaximum)
+    function getSingleParams(uint256 amountsIn, uint256 amountOutMinimum)
         public
         view
         returns (ISwapRouter.ExactInputSingleParams memory)
@@ -407,14 +411,18 @@ contract BaiController is
                 recipient: address(this),
                 deadline: block.timestamp,
                 amountIn: amountsIn,
-                amountOutMinimum: amountInMaximum,
+                amountOutMinimum: amountOutMinimum,
                 sqrtPriceLimitX96: 0
             });
     }
 
     function findBestPath(uint256 amountsIn)
         public
-        returns (bool isMultihop, uint256 amountsOut)
+        returns (
+            bool isMultihop,
+            uint256 amountsOut,
+            uint24[2] memory fees
+        )
     {
         uint256 singleQuote = quoter.quoteExactInputSingle(
             address(USDC),
@@ -424,22 +432,35 @@ contract BaiController is
             0 // sqrtPriceLimitX96
         );
 
-        uint256 multihopQuote = quoter.quoteExactInput(
-            getEncodedPath(),
-            amountsIn
-        );
+        uint256 multihopQuote = 0;
+        for (uint24 i = 0; i < multihopFees.length; i++) {
+            uint256 out = quoter.quoteExactInput(
+                getEncodedPath(multihopFees[i]),
+                amountsIn
+            );
+            if (out > multihopQuote) {
+                fees = multihopFees[i];
+                multihopQuote = out;
+            }
+        }
 
         isMultihop = multihopQuote > singleQuote ? true : false;
-        amountsOut = MathUpgradeable.max(singleQuote, multihopQuote);
+        amountsOut = multihopQuote > singleQuote ? multihopQuote : singleQuote;
+
+        emit PathFound(isMultihop ? fees : [uint24(0), uint24(0)], amountsOut);
     }
 
-    function getEncodedPath() public view returns (bytes memory) {
+    function getEncodedPath(uint24[2] memory fees)
+        public
+        view
+        returns (bytes memory)
+    {
         return
             abi.encodePacked(
                 address(USDC),
-                uint24(500),
+                fees[0],
                 IPeripheryImmutableState(address(swapRouter)).WETH9(),
-                uint24(3000),
+                fees[1],
                 address(WBTC)
             );
     }
@@ -482,11 +503,11 @@ contract BaiController is
             if (
                 (userLastTraded == 0 &&
                     usdcBalance[currentUser] >= _config.amountPerTime) ||
-                (userLastTraded.add(duration) <= block.timestamp &&
+                (userLastTraded + (duration) <= block.timestamp &&
                     usdcBalance[currentUser] >= _config.amountPerTime) // never traded before and has enough balance
             ) {
                 if (j == count) break;
-                totalUsdc = totalUsdc.add(_config.amountPerTime);
+                totalUsdc = totalUsdc + (_config.amountPerTime);
                 activeInvestors[j] = currentUser;
                 amounts[j] = _config.amountPerTime;
 
@@ -497,7 +518,7 @@ contract BaiController is
         require(activeInvestors[count - 1] != address(0), "Calculation error");
 
         for (uint256 i = 0; i < activeInvestors.length; i++) {
-            percentages[i] = amounts[i].mul(DENOMINATOR).div(totalUsdc);
+            percentages[i] = (amounts[i] * (DENOMINATOR)) / (totalUsdc);
         }
     }
 
@@ -522,10 +543,10 @@ contract BaiController is
             if (
                 (userLastTraded == 0 &&
                     usdcBalance[currentUser] >= _config.amountPerTime) ||
-                (userLastTraded.add(duration) <= block.timestamp &&
+                (userLastTraded + (duration) <= block.timestamp &&
                     usdcBalance[currentUser] >= _config.amountPerTime) // never traded before and has enough balance
             ) {
-                total = total.add(1);
+                total = total + (1);
                 if (total > maxItemsPerStep) break;
             }
         }
@@ -555,9 +576,7 @@ contract BaiController is
         myBtcBalance = btcBalance[user];
         myLastTraded = lastTraded[user];
         totalTxs = transactions[user].length;
-        nextTrade = myLastTraded.add(
-            getTimeWindowInSeconds(myConfig.frequency)
-        );
+        nextTrade = myLastTraded + (getTimeWindowInSeconds(myConfig.frequency));
     }
 
     function myTransactions(address user) external view returns (Tx[] memory) {
