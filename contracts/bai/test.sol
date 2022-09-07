@@ -38,7 +38,7 @@ interface IBaiController {
     function swap() external returns (bool);
 }
 
-contract BaiController is
+contract BaiTestController is
     IBaiController,
     AccessControlUpgradeable,
     PausableUpgradeable
@@ -57,22 +57,11 @@ contract BaiController is
         uint256 amountOut;
     }
 
-    ISwapRouter public swapRouter;
-    address public pool;
-    IQuoter public quoter;
-    // address public immutable uniswapV2Pair;
-    IERC20Upgradeable public WBTC; // =
-    // IERC20Upgradeable(0x577D296678535e4903D59A4C929B718e1D575e0A); // rinkeby // mainnet: 0x2260fac5e5542a773aa44fbcfedf7c193bc2c599 //kovan: 0xd3A691C852CDB01E281545A27064741F0B7f6825
-    IERC20Upgradeable public USDC; // =
-    // IERC20Upgradeable(0x4DBCdF9B62e891a7cec5A2568C3F4FAF9E8Abe2b); // rinkeby // mainnet: 0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48 //kovan: 0xb7a4F3E9097C08dA09517b5aB877F7a917224ede
-    // address private constant address(swapRouter) = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
-    address[] investors;
     mapping(address => Configuration) private configurations;
     mapping(address => uint256) private usdcBalance;
     mapping(address => uint256) private btcBalance;
     mapping(address => Tx[]) private transactions;
     mapping(address => uint256) private lastTraded;
-    mapping(address => bool) public exists;
     uint256 public constant MIN_AMOUNT = 10**6 * 10; // min 10 USDC
     uint256 public constant DENOMINATOR = 1e4;
     bool swapInProgress = false;
@@ -113,22 +102,10 @@ contract BaiController is
         _;
     }
 
-    function initialize(
-        address ownerAccount,
-        address wbtc,
-        address usdc,
-        address uniswapRouter,
-        address quoterAddress
-    ) public initializer whenNotPaused {
+    function initialize(address ownerAccount) public initializer whenNotPaused {
         require(ownerAccount != address(0), "BAI::constructor:Zero address");
 
-        WBTC = IERC20Upgradeable(wbtc);
-        USDC = IERC20Upgradeable(usdc);
         maxItemsPerStep = 100;
-
-        // mainnet
-        swapRouter = ISwapRouter(uniswapRouter);
-        quoter = IQuoter(quoterAddress);
 
         _setupRole(DEFAULT_ADMIN_ROLE, ownerAccount);
 
@@ -142,35 +119,6 @@ contract BaiController is
 
     //to recieve ETH from swapRouter when swaping
     receive() external payable {}
-
-    function upgradeOnce() external onlyRole(DEFAULT_ADMIN_ROLE) {
-        for (uint256 i = 0; i < investors.length; i++) {
-            _investors.add(investors[i]);
-        }
-    }
-
-    function kill() external onlyRole(DEFAULT_ADMIN_ROLE) {
-        uint256 balance = USDC.balanceOf(address(this));
-        if (balance > 0) USDC.safeTransfer(_msgSender(), balance);
-        balance = WBTC.balanceOf(address(this));
-        if (balance > 0) WBTC.safeTransfer(_msgSender(), balance);
-        selfdestruct(payable(_msgSender()));
-    }
-
-    function setMultihopFees(uint24[2][] memory _fees)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
-        multihopFees = _fees;
-    }
-
-    function setSwapRouter(address _router)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
-        require(address(swapRouter) != _router, "no change");
-        swapRouter = ISwapRouter(_router);
-    }
 
     function setMaxItemPerStep(uint8 step)
         external
@@ -196,14 +144,8 @@ contract BaiController is
     function collectFees() external onlyFeeCollector {
         require(totalFees > 0, "no fee");
         require(feeCollector != address(0), "feeCollector is zero");
-        uint256 balance = WBTC.balanceOf(address(this));
-        if (balance >= totalFees) WBTC.safeTransfer(feeCollector, totalFees);
-        else WBTC.safeTransfer(feeCollector, balance);
 
-        emit FeeCollected(
-            feeCollector,
-            MathUpgradeable.min(balance, totalFees)
-        );
+        emit FeeCollected(feeCollector, totalFees);
     }
 
     function config(Frequency frequency, uint256 amountPerTime)
@@ -234,15 +176,6 @@ contract BaiController is
         address user = _msgSender();
         require(user != address(0), "zero address");
         require(amountOfUSDC >= MIN_AMOUNT, "Invalid amount of USDC");
-        require(
-            USDC.allowance(user, address(this)) >= amountOfUSDC,
-            "Approval required"
-        );
-        require(
-            amountOfUSDC <= USDC.balanceOf(user),
-            "Insufficient balance of USDC"
-        );
-        USDC.safeTransferFrom(address(user), address(this), amountOfUSDC);
 
         usdcBalance[user] = usdcBalance[user] + (amountOfUSDC);
         emit UserToppedUp(user, amountOfUSDC);
@@ -266,32 +199,8 @@ contract BaiController is
         );
         require(usdcBalance[_user] >= usdcAmount, "Insufficient USDC amount");
         require(btcBalance[_user] >= btcAmount, "Insufficient WBTC amount");
-        // require(USDC.balanceOf(address(this)) >= usdcBalance[_user], 'Insufficient USDC on BAI');
-        // require(WBTC.balanceOf(address(this)) >= btcBalance[_user], 'Insufficient WBTC on BAI');
 
-        uint256 _allowanceOfUsdc = USDC.allowance(
-            address(this),
-            address(swapRouter)
-        );
-        uint256 _allowanceOfBtc = WBTC.allowance(
-            address(this),
-            address(swapRouter)
-        );
-
-        if (_allowanceOfUsdc == 0)
-            USDC.safeApprove(address(swapRouter), 2**256 - 1); // infinity approval
-        if (_allowanceOfBtc == 0)
-            WBTC.safeApprove(address(swapRouter), 2**256 - 1); // infinity approval
-
-        uint256 valOfUsdc = USDC.balanceOf(address(this)) >= usdcAmount
-            ? usdcAmount
-            : USDC.balanceOf(address(this));
-        uint256 valOfBtc = WBTC.balanceOf(address(this)) >= btcAmount
-            ? btcAmount
-            : WBTC.balanceOf(address(this));
-
-        if (valOfUsdc > 0) USDC.safeTransfer(_user, valOfUsdc);
-        if (valOfBtc > 0) WBTC.safeTransfer(_user, valOfBtc);
+        emit Withdrawn(_user, usdcBalance[_user], btcBalance[_user]);
 
         if (usdcBalance[_user] == 0) delete usdcBalance[_user];
         else usdcBalance[_user] = usdcBalance[_user] - (usdcAmount);
@@ -302,8 +211,6 @@ contract BaiController is
             delete configurations[_user];
             _investors.remove(_user);
         }
-
-        emit Withdrawn(_user, valOfUsdc, valOfBtc);
 
         return true;
     }
@@ -326,34 +233,9 @@ contract BaiController is
         require(totalUsdc > 0, "No need to swap");
         require(activeInvestors.length > 0, "No users to buy");
 
-        uint256 _usdcBalance = USDC.balanceOf(address(this));
-        require(_usdcBalance >= totalUsdc, "Insufficient USDC balance");
-
         swapInProgress = true;
 
-        uint256 _allowanceOfUsdc = USDC.allowance(
-            address(this),
-            address(swapRouter)
-        );
-        if (_allowanceOfUsdc < totalUsdc)
-            USDC.safeApprove(address(swapRouter), 2**256 - 1); // infinity approval
-
-        (
-            bool isMultihop,
-            uint256 amountsOut,
-            uint24[2] memory fees
-        ) = findBestPath(totalUsdc);
-
-        uint256 amountOfBTC;
-        if (isMultihop) {
-            amountOfBTC = swapRouter.exactInput(
-                getMultihopParams(totalUsdc, amountsOut, fees)
-            );
-        } else {
-            amountOfBTC = swapRouter.exactInputSingle(
-                getSingleParams(totalUsdc, amountsOut)
-            );
-        }
+        uint256 amountOfBTC = (totalUsdc * 9997) / 1000; // 3% more fees
 
         amountOfBTC = deductFees(amountOfBTC);
 
@@ -377,7 +259,7 @@ contract BaiController is
             btcBalance[investor] = btcBalance[investor] + (userBTC);
         }
 
-        emit Swapped(address(USDC), totalUsdc, address(WBTC), amountOfBTC);
+        emit Swapped(address(0), totalUsdc, address(0), amountOfBTC);
 
         swapInProgress = false;
         return hasNext;
@@ -386,88 +268,6 @@ contract BaiController is
     function deductFees(uint256 amountOfBTC) private returns (uint256 leftBTC) {
         leftBTC = (amountOfBTC * (DENOMINATOR - (fee))) / (DENOMINATOR);
         totalFees = totalFees + (amountOfBTC - (leftBTC));
-    }
-
-    function getMultihopParams(
-        uint256 amountsIn,
-        uint256 amountOutMinimum,
-        uint24[2] memory fees
-    ) public view returns (ISwapRouter.ExactInputParams memory) {
-        return
-            ISwapRouter.ExactInputParams({
-                path: getEncodedPath(fees),
-                recipient: address(this),
-                deadline: block.timestamp,
-                amountIn: amountsIn,
-                amountOutMinimum: amountOutMinimum
-            });
-    }
-
-    function getSingleParams(uint256 amountsIn, uint256 amountOutMinimum)
-        public
-        view
-        returns (ISwapRouter.ExactInputSingleParams memory)
-    {
-        return
-            ISwapRouter.ExactInputSingleParams({
-                tokenIn: address(USDC),
-                tokenOut: address(WBTC),
-                fee: 3000,
-                recipient: address(this),
-                deadline: block.timestamp,
-                amountIn: amountsIn,
-                amountOutMinimum: amountOutMinimum,
-                sqrtPriceLimitX96: 0
-            });
-    }
-
-    function findBestPath(uint256 amountsIn)
-        public
-        returns (
-            bool isMultihop,
-            uint256 amountsOut,
-            uint24[2] memory fees
-        )
-    {
-        uint256 singleQuote = quoter.quoteExactInputSingle(
-            address(USDC),
-            address(WBTC),
-            uint24(3000), //fee
-            amountsIn,
-            0 // sqrtPriceLimitX96
-        );
-
-        uint256 multihopQuote = 0;
-        for (uint24 i = 0; i < multihopFees.length; i++) {
-            uint256 out = quoter.quoteExactInput(
-                getEncodedPath(multihopFees[i]),
-                amountsIn
-            );
-            if (out > multihopQuote) {
-                fees = multihopFees[i];
-                multihopQuote = out;
-            }
-        }
-
-        isMultihop = multihopQuote > singleQuote ? true : false;
-        amountsOut = multihopQuote > singleQuote ? multihopQuote : singleQuote;
-
-        emit PathFound(isMultihop ? fees : [uint24(0), uint24(0)], amountsOut);
-    }
-
-    function getEncodedPath(uint24[2] memory fees)
-        public
-        view
-        returns (bytes memory)
-    {
-        return
-            abi.encodePacked(
-                address(USDC),
-                fees[0],
-                IPeripheryImmutableState(address(swapRouter)).WETH9(),
-                fees[1],
-                address(WBTC)
-            );
     }
 
     function prepare()
