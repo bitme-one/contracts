@@ -36,6 +36,13 @@ const config: HardhatUserConfig = {
       url: `https://rinkeby.infura.io/v3/${INFURA_API_KEY}`,
       accounts: [RINKEBY_PRIVATE_KEY],
     },
+    optimism: {
+      url: 'https://mainnet.optimism.io',
+      chainId: 10,
+      accounts: [
+        process.env.OPTIMISM_PROXY_ADMIN_PRIVATE_KEY!, // deployer
+        process.env.OPTIMISM_ADMIN_PRIVATE_KEY!], // admin
+    },
     coverage: {
       url: "http://127.0.0.1:8555", // Coverage launches its own ganache-cli client
     },

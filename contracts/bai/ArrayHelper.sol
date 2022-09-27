@@ -11,7 +11,7 @@ library ArrayHelper {
     event Log(uint256 i);
 
     function add(Inner storage self, address addr)
-        internal
+        public
         returns (uint256 index)
     {
         if (self.indexes[addr] == 0) {
@@ -23,7 +23,7 @@ library ArrayHelper {
     }
 
     function getIndex(Inner storage self, address addr)
-        internal
+        public
         view
         returns (uint256)
     {
@@ -32,7 +32,7 @@ library ArrayHelper {
     }
 
     function getByIndex(Inner storage self, uint256 index)
-        internal
+        public
         view
         returns (address)
     {
@@ -40,7 +40,7 @@ library ArrayHelper {
         return self.array[index];
     }
 
-    function remove(Inner storage self, address addr) internal {
+    function remove(Inner storage self, address addr) public {
         uint256 index = getIndex(self, addr);
         emit Log(index);
 
@@ -55,7 +55,7 @@ library ArrayHelper {
         delete self.indexes[addr];
     }
 
-    function length(Inner storage self) internal view returns (uint256) {
+    function length(Inner storage self) public view returns (uint256) {
         return self.array.length;
     }
 }
