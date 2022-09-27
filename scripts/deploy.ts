@@ -1,4 +1,5 @@
 import { ethers } from "hardhat";
+import { BaiController, MyProxy } from "../typechain";
 import helperDeploy from './001_arrayHelper'
 
 // const WBTC = { optimism: '0x68f180fcCe6836688e9084f035309E29Bf0A2095' }
@@ -21,7 +22,7 @@ async function main() {
 
   const Proxy = await ethers.getContractFactory("MyProxy", { signer: deployer });
   const proxyAddr = '0x92c22e13B638c81227ae9316980ba649216EeD1A'
-  const proxy = await Proxy.attach(proxyAddr)
+  const proxy = (await Proxy.attach(proxyAddr)) as MyProxy
 
   const implAddr = '0x' + (await ethers.provider.getStorageAt(proxyAddr, '0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc')).substr(-40)
   console.log(`Proxy deployed to: ${proxyAddr} with impl: ${implAddr}`)
@@ -35,9 +36,9 @@ async function main() {
   })
 
   const reDeployImpl = false
-  let bai
+  let bai: BaiController
   if (reDeployImpl) {
-    bai = await BAI.deploy() //unsafeAllowLinkedLibraries: true
+    bai = (await BAI.deploy()) as BaiController //unsafeAllowLinkedLibraries: true
     await bai.deployed()
     console.log(`BAIImpl deployed to: ${bai.address}.`)
     const tx = await proxy.upgradeTo(bai.address)
@@ -45,7 +46,7 @@ async function main() {
     console.log(`BAIProxy upgraded to: ${bai.address}.`)
   }
 
-  bai = await BAI.attach(proxyAddr)
+  bai = (await BAI.attach(proxyAddr)) as BaiController
   console.log(`BAI deployed to: ${bai.address}.`)
 
   const needUpgrade = false
